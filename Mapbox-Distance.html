@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Point Distance</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src='https://unpkg.com/@turf/turf/turf.min.js'></script>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.css' rel='stylesheet' />
+    <!-- Promise polyfill script required to use Mapbox GL Geocoder in IE 11 -->
+    <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.min.js"></script>
+    <link
+    rel="stylesheet"
+    href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.css"
+    type="text/css"
+/>
+  </head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    #map-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: rgba(255, 255, 255, 0.8);
+      margin-left: 20px;
+      margin-top: 20px;
+      padding: 10px 0 0 10px;
+      font-family: Arial, sans-serif;
+      overflow: auto;
+      width: 200px;
+      height: 50px;
+      border-radius: 3px;
+    }
+
+  </style>
+
+  <body>
+    <div id='map'></div>
+    <div id='map-overlay'>Distance: </div>
+    <script>
+      mapboxgl.accessToken = 'pk.eyJ1IjoiYmFpbGV5cnVzc28iLCJhIjoiY2toZmJhNXIwMG9teTJ4bHlibmw3ampoZSJ9.zD80yks6NLPBJ66YjmrMKA';
+      var map = new mapboxgl.Map({
+        container: 'map', // container id
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: [-89.384, 43.101],
+        zoom: 5
+      });
+
+      //YOUR TURN: Replace var to = [lng, lat] with the lng/lat for Madison, WI [-89.384, 43.101] 
+      //YOUR TURN: Replace var to = [lng, lat] with the lng/lat for Chicago, Il [-87.627, 41.919] 
+      var canvas = map.getCanvasContainer();
+
+      var to = [-74.007539, 40.731015] //lng, lat
+      var from = [-74.006058, 41.730739] //lng, lat 
+
+      var greenMarker = new mapboxgl.Marker({
+          color: 'green'
+        })
+        .setLngLat(to) // marker position using variable 'to'
+        .addTo(map); //add marker to map
+
+      var purpleMarker = new mapboxgl.Marker({
+          color: 'purple'
+        })
+        .setLngLat(from) // marker position using variable 'from'
+        .addTo(map); //add marker to map
+
+      var options = {
+        units: 'miles'
+      }; // units can be degrees, radians, miles, or kilometers, just be sure to change the units in the text box to match. 
+
+      var start = [-122.662323, 45.523751];
+
+
+      map.addControl(
+        new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken,
+        mapboxgl: mapboxgl
+        })    
+        );
+    map.addControl(
+        new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken,
+        mapboxgl: mapboxgl,
+        marker: {
+            color: "orange"
+        }
+        })
+        );
+
+   
+
+        
+
+        
+
+// create a function to make a directions request
+function getRoute(end) {
+  // make directions request using cycling profile
+  var url =
+    'https://api.mapbox.com/directions/v5/mapbox/cycling/' +
+    start[0] +
+    ',' +
+    start[1] +
+    ';' +
+    end[0] +
+    ',' +
+    end[1] +
+    '?steps=true&geometries=geojson&access_token=' +
+    mapboxgl.accessToken;
+
+  // make an XHR request https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest
+  var req = new XMLHttpRequest();
+  req.open('GET', url, true);
+  req.onload = function () {
+    var json = JSON.parse(req.response);
+    var data = json.routes[0];
+    var route = data.geometry.coordinates;
+    var geojson = {
+      'type': 'Feature',
+      'properties': {},
+      'geometry': {
+        'type': 'LineString',
+        'coordinates': route
+      }
+    };
+    // if the route already exists on the map, we'll reset it using setData
+    if (map.getSource('route')) {
+      map.getSource('route').setData(geojson);
+    }
+    // otherwise, we'll make a new request
+    else {
+      map.addLayer({
+        'id': 'route',
+        'type': 'line',
+        'source': {
+          'type': 'geojson',
+          'data': {
+            'type': 'Feature',
+            'properties': {},
+            'geometry': {
+              'type': 'LineString',
+              'coordinates': geojson
+            }
+          }
+        },
+        'layout': {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        'paint': {
+          'line-color': '#3887be',
+          'line-width': 5,
+          'line-opacity': 0.75
+        }
+      });
+    }
+
+  };
+  req.send();
+}
+
+map.on('load', function () {
+  // make an initial directions request that
+  // starts and ends at the same location
+  getRoute(start);
+
+  // Add destination to the map
+  map.addLayer({
+    'id': 'point',
+    'type': 'circle',
+    'source': {
+      'type': 'geojson',
+      'data': {
+        'type': 'FeatureCollection',
+        'features': [
+          {
+            'type': 'Feature',
+            'properties': {},
+            'geometry': {
+              'type': 'Point',
+              'coordinates': start
+            }
+          }
+        ]
+      }
+    },
+    'paint': {
+      'circle-radius': 10,
+      'circle-color': '#3887be'
+    }
+  });
+  
+  // allow the user to click the map to change the destination
+  map.on('click', function (e) {
+    var coordsObj = e.lngLat;
+    canvas.style.cursor = '';
+    var coords = Object.keys(coordsObj).map(function (key) {
+      return coordsObj[key];
+    });
+    var end = {
+      'type': 'FeatureCollection',
+      'features': [
+        {
+          'type': 'Feature',
+          'properties': {},
+          'geometry': {
+            'type': 'Point',
+            'coordinates': coords
+          }
+        }
+      ]
+    };
+     let holder =end.features[0].geometry.coordinates;
+
+     var distance = turf.distance(start, holder, options);
+
+    let cost = distance * .75;
+
+    var value = document.getElementById('map-overlay')
+    value.innerHTML = "Distance: " + distance.toFixed([2]) + " miles Cost: $" + cost.toFixed(2);  
+
+
+    if (map.getLayer('end')) {
+      map.getSource('end').setData(end);
+    } else {
+      map.addLayer({
+        'id': 'end',
+        'type': 'circle',
+        'source': {
+          'type': 'geojson',
+          'data': {
+            'type': 'FeatureCollection',
+            'features': [
+              {
+                'type': 'Feature',
+                'properties': {},
+                'geometry': {
+                  'type': 'Point',
+                  'coordinates': coords
+                }
+              }
+            ]
+          }
+        },
+        'paint': {
+          'circle-radius': 10,
+          'circle-color': '#f30'
+        }
+      });
+    }
+    getRoute(coords);
+  });
+});
+        
+
+
+    </script>
+  </body>
+
+</html>
